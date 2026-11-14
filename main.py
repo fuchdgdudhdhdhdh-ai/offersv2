@@ -19,7 +19,7 @@ import db  # noqa: E402
 import ui  # noqa: E402
 from config import load  # noqa: E402
 from handlers_admin import router as admin_router  # noqa: E402
-from handlers_user import router as user_router  # noqa: E402
+from handlers_user import handle_widget_query, router as user_router  # noqa: E402
 from middleware import ContextMiddleware  # noqa: E402
 
 log = logging.getLogger("main")
@@ -72,6 +72,9 @@ async def webhook(request: web.Request) -> web.Response:
     except Exception:
         log.exception("невалидный JSON")
         raise web.HTTPBadRequest()
+    if isinstance(payload, dict) and isinstance(payload.get("widget_query"), dict):
+        asyncio.create_task(handle_widget_query(payload["widget_query"], bot, cfg))
+        return web.json_response({"ok": True})
     try:
         update = Update.model_validate(payload, context={"bot": bot})
     except Exception:
@@ -102,10 +105,13 @@ async def health(_: web.Request) -> web.Response:
 async def on_startup(app: web.Application) -> None:
     await bot.set_my_commands(COMMANDS)
     url = f"{cfg.webhook_base}/tg/{cfg.webhook_secret}"
+    allowed_updates = dp.resolve_used_update_types()
+    if "widget_query" not in allowed_updates:
+        allowed_updates.append("widget_query")
     await bot.set_webhook(
         url,
         secret_token=cfg.webhook_secret,
-        allowed_updates=dp.resolve_used_update_types(),
+        allowed_updates=allowed_updates,
         drop_pending_updates=True,
     )
     log.info("webhook: %s", url)
@@ -135,7 +141,10 @@ async def main() -> None:
         log.warning("WEBHOOK_BASE_URL пуст — работаю в режиме polling")
         await bot.set_my_commands(COMMANDS)
         await bot.delete_webhook(drop_pending_updates=True)
-        await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
+        allowed_updates = dp.resolve_used_update_types()
+        if "widget_query" not in allowed_updates:
+            allowed_updates.append("widget_query")
+        await dp.start_polling(bot, allowed_updates=allowed_updates)
         return
 
     runner = web.AppRunner(build_app())
