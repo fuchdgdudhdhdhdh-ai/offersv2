@@ -112,13 +112,16 @@ async def queue(c: CallbackQuery, cfg: Config) -> None:
     await c.answer()
 
 
+
 @router.callback_query(F.data.startswith("adm:off:"))
 async def offer_card(c: CallbackQuery, cfg: Config) -> None:
     if not await guard(c, cfg):
         return
+
     o = await db.get_offer(int(c.data.split(":")[2]))
     if not o:
         return await c.answer("Не найден", show_alert=True)
+
     await c.message.edit_text(
         f"<b>Оффер #{o['id']}</b>\n\n"
         f"От: {ui.uname(o['creator_username'], o['creator_id'])}\n"
@@ -128,13 +131,23 @@ async def offer_card(c: CallbackQuery, cfg: Config) -> None:
         f"Статус: {ui.STATUS_LABEL[o['status']]}\n"
         f"«Я передал»: {'да' if o['recipient_claimed'] else 'нет'}",
         reply_markup=ui.KB(inline_keyboard=[
-            *[[ui.B(text="Подтвердить получение", callback_data=f"adm:ok:{o['id']}")]] if o["status"] == "accepted" else [],
-            *[[ui.B(text="Выплатить", callback_data=f"adm:pay:{o['id']}")]] if o["status"] == "completed" else [],
-            *[[ui.B(text="Отменить (возврат)", callback_data=f"adm:no:{o['id']}")]] if o["status"] in ("accepted", "completed") else [],
+            *(
+                [[ui.B(text="Подтвердить получение", callback_data=f"adm:ok:{o['id']}")]]
+                if o["status"] == "accepted" else []
+            ),
+            *(
+                [[ui.B(text="Выплатить", callback_data=f"adm:pay:{o['id']}")]]
+                if o["status"] == "completed" else []
+            ),
+            *(
+                [[ui.B(text="Отменить (возврат)", callback_data=f"adm:no:{o['id']}")]]
+                if o["status"] in ("accepted", "completed") else []
+            ),
             [ui.B(text="Написать получателю", url=f"tg://user?id={o['recipient_id']}")],
             [ui.B(text="Назад", callback_data="adm:queue")],
         ]),
     )
+
     await c.answer()
 
 
@@ -142,17 +155,31 @@ async def offer_card(c: CallbackQuery, cfg: Config) -> None:
 async def confirm_gift(c: CallbackQuery, cfg: Config, bot: Bot) -> None:
     if not await guard(c, cfg):
         return
+
     o = await db.complete_offer(int(c.data.split(":")[2]))
     if not o:
         return await c.answer("Уже обработано", show_alert=True)
 
-    await ui.send_safe(bot, o["recipient_id"],
-                       f"Получение подарка по офферу #{o['id']} подтверждено. Сделка завершена.\n\n{ui.PAYOUT_NOTE}")
-    await ui.send_safe(bot, o["creator_id"],
-                       f"Получение подарка по офферу #{o['id']} подтверждено. "
-                       f"{ui.amt(o['amount'], o['currency'])} ждут выплаты получателю.")
-    await c.message.edit_text(f"Подтверждено. Оффер #{o['id']} ждёт выплаты.",
-                              reply_markup=ui.KB(inline_keyboard=[[ui.B(text="К очереди", callback_data="adm:queue")]]))
+    await ui.send_safe(
+        bot,
+        o["recipient_id"],
+        f"Получение подарка по офферу #{o['id']} подтверждено. Сделка завершена.\n\n{ui.PAYOUT_NOTE}"
+    )
+
+    await ui.send_safe(
+        bot,
+        o["creator_id"],
+        f"Получение подарка по офферу #{o['id']} подтверждено. "
+        f"{ui.amt(o['amount'], o['currency'])} ждут выплаты получателю."
+    )
+
+    await c.message.edit_text(
+        f"Подтверждено. Оффер #{o['id']} ждёт выплаты.",
+        reply_markup=ui.KB(inline_keyboard=[
+            [ui.B(text="К очереди", callback_data="adm:queue")]
+        ])
+    )
+
     await c.answer("Готово")
 
 
