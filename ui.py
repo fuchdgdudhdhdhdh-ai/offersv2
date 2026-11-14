@@ -150,7 +150,7 @@ def offer_text(o: dict, role: str) -> str:
         lines.append(f"Номер оффера: <code>{o['id']}</code>")
 
     if o["status"] == "accepted" and role == "recipient":
-        lines += ["", "Передайте подарок и нажмите «Я передал».", ""]
+        lines += ["", "Ожидается передача подарка. Администратор подтвердит получение.", ""]
     if o["status"] == "completed":
         lines += ["", PAYOUT_NOTE, ""]
     if o["status"] == "paid":
@@ -179,27 +179,15 @@ def widget_url(base: str, o: dict) -> str:
 def offer_kb(o: dict, role: str, webapp_base: str = "", gifts_to: str = "") -> KB | None:
     rows: list[list[B]] = []
     status = o["status"]
-
     if role == "recipient":
         if status == "pending":
             rows.append([B(text="Принять", callback_data=f"of:acc:{o['id']}")])
             rows.append([B(text="Отклонить", callback_data=f"of:rej:{o['id']}")])
-        elif status == "accepted":
-            rows.append([B(text="Передать NFT", url=send_gift_url(o["creator_username"], gifts_to))])
-            rows.append([B(text="Страница подарка", url=o["gift_link"])])
-            rows.append([B(text="Как передать?", callback_data=f"of:how:{o['id']}")])
-            if not o.get("recipient_claimed"):
-                rows.append([B(text="Я передал", callback_data=f"of:sent:{o['id']}")])
-        elif status == "completed":
-            rows.append([B(text="Страница подарка", url=o["gift_link"])])
-        if webapp_base and status in ("pending", "accepted"):
-            rows.append([B(text="Открыть виджет", web_app=WebAppInfo(url=widget_url(webapp_base, o)))])
     else:
         if status == "pending":
             rows.append([B(text="Отменить оффер", callback_data=f"of:cancel:{o['id']}")])
         if status in ("accepted", "completed"):
             rows.append([B(text="Написать получателю", url=f"tg://user?id={o['recipient_id']}")])
-
     return KB(inline_keyboard=rows) if rows else None
 
 
@@ -226,10 +214,9 @@ async def send_safe(bot: Bot, chat_id: int, text: str, kb: KB | None = None,
         return False
 # ---------- Telegram HTML Widgets (Bot API 10.4) ----------
 def widget_state(o: dict) -> dict:
-    return {"offer_id":o["id"],"slug":o["gift_slug"],"title":o["gift_title"],
+    return {"offer_id":o["id"],"title":o["gift_title"],
             "sender":"@"+o["creator_username"] if o.get("creator_username") else str(o["creator_id"]),
-            "price":o["amount"],"currency":o["currency"],"status":o["status"],
-            "recipient_claimed":bool(o.get("recipient_claimed",0))}
+            "price":o["amount"],"currency":o["currency"],"status":o["status"]}
 
 async def _widget_api(bot: Bot, method: str, payload: dict) -> dict | None:
     timeout=aiohttp.ClientTimeout(total=10)
@@ -261,7 +248,6 @@ async def send_widget(bot: Bot, chat_id: int, offer: dict) -> dict | None:
         log.error("chat_data оффера #%s превышает 1024 байта",offer["id"])
         return None
     return await _widget_api(bot,"sendWidget",{"chat_id":chat_id,"html":html,
-        "caption":f"NFT Offer · {offer['gift_title']} · {amt(offer['amount'],offer['currency'])}",
         "allow_queries":True,"chat_data":state})
 
 async def answer_widget_query(bot: Bot, query_id: str, result: str) -> None:

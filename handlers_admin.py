@@ -157,31 +157,20 @@ async def offer_card(c: CallbackQuery, cfg: Config) -> None:
 async def confirm_gift(c: CallbackQuery, cfg: Config, bot: Bot) -> None:
     if not await guard(c, cfg):
         return
-
     o = await db.complete_offer(int(c.data.split(":")[2]))
     if not o:
         return await c.answer("Уже обработано", show_alert=True)
-
+    if o.get("widget_chat_id") and o.get("widget_message_id"):
+        await ui.edit_widget_data(bot, o["widget_chat_id"], o["widget_message_id"], o)
     await ui.send_safe(
-        bot,
-        o["recipient_id"],
-        f"Получение подарка по офферу #{o['id']} подтверждено. Сделка завершена.\n\n{ui.PAYOUT_NOTE}"
-    )
-
-    await ui.send_safe(
-        bot,
-        o["creator_id"],
+        bot, o["creator_id"],
         f"Получение подарка по офферу #{o['id']} подтверждено. "
         f"{ui.amt(o['amount'], o['currency'])} ждут выплаты получателю."
     )
-
     await c.message.edit_text(
         f"Подтверждено. Оффер #{o['id']} ждёт выплаты.",
-        reply_markup=ui.KB(inline_keyboard=[
-            [ui.B(text="К очереди", callback_data="adm:queue")]
-        ])
+        reply_markup=ui.KB(inline_keyboard=[[ui.B(text="К очереди", callback_data="adm:queue")]])
     )
-
     await c.answer("Готово")
 
 
@@ -207,8 +196,8 @@ async def pay(c: CallbackQuery, cfg: Config, bot: Bot) -> None:
     o = await db.pay_offer(int(c.data.split(":")[2]))
     if not o:
         return await c.answer("Уже выплачено", show_alert=True)
-    await ui.send_safe(bot, o["recipient_id"],
-                       f"Выплата по офферу #{o['id']} зачислена: {ui.amt(o['amount'], o['currency'])}.")
+    if o.get("widget_chat_id") and o.get("widget_message_id"):
+        await ui.edit_widget_data(bot, o["widget_chat_id"], o["widget_message_id"], o)
     await c.message.edit_text(f"Выплачено по офферу #{o['id']}.",
                               reply_markup=ui.KB(inline_keyboard=[[ui.B(text="К выплатам", callback_data="adm:payouts")]]))
     await c.answer("Готово")
