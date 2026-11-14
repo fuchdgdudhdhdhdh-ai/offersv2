@@ -56,6 +56,8 @@ MIGRATIONS = (
     "ALTER TABLE offers ADD COLUMN recipient_claimed INTEGER NOT NULL DEFAULT 0",
     "ALTER TABLE offers ADD COLUMN completed_at INTEGER",
     "ALTER TABLE offers ADD COLUMN paid_at INTEGER",
+    "ALTER TABLE offers ADD COLUMN widget_chat_id INTEGER",
+    "ALTER TABLE offers ADD COLUMN widget_message_id INTEGER",
 )
 
 
@@ -298,6 +300,17 @@ def pay_offer(offer_id: int) -> dict | None:
 def set_claimed(offer_id: int) -> None:
     _conn.execute("UPDATE offers SET recipient_claimed=1 WHERE id=?", (offer_id,))
 
+
+
+@aio
+def set_widget_message(offer_id: int, chat_id: int, message_id: int) -> None:
+    _conn.execute("UPDATE offers SET widget_chat_id=?, widget_message_id=? WHERE id=?",
+                  (chat_id,message_id,offer_id))
+
+@aio
+def get_offer_by_widget(chat_id: int, message_id: int) -> dict | None:
+    return _row(_conn.execute("SELECT * FROM offers WHERE widget_chat_id=? AND widget_message_id=?",
+                              (chat_id,message_id)).fetchone())
 
 # ---------- платежи ----------
 
