@@ -99,16 +99,15 @@ async def queue(c: CallbackQuery, cfg: Config) -> None:
     rows = await db.list_offers(status="accepted", limit=20)
     kb = InlineKeyboardBuilder()
     for o in rows:
-        mark = " · сообщил" if o["recipient_claimed"] else ""
         kb.button(
             text=f"#{o['id']} @{o['recipient_username'] or o['recipient_id']} "
-                 f"{ui.amt(o['amount'], o['currency'])}{mark}",
+                 f"{ui.amt(o['amount'], o['currency'])}",
             callback_data=f"adm:off:{o['id']}",
         )
     kb.button(text="Назад", callback_data="adm:home")
     kb.adjust(1)
     await c.message.edit_text(
-        f"<b>Ожидают подтверждения</b> ({len(rows)})\nМетка «сообщил» — получатель нажал «Я передал».",
+        f"<b>Ожидают подтверждения</b> ({len(rows)})\nАдминистратор подтверждает передачу вручную.",
         reply_markup=kb.as_markup(),
     )
     await c.answer()
@@ -131,7 +130,6 @@ async def offer_card(c: CallbackQuery, cfg: Config) -> None:
         f"Подарок: <a href=\"{o['gift_link']}\">{ui.escape(o['gift_title'])}</a>\n"
         f"Сумма: <b>{ui.amt(o['amount'], o['currency'])}</b>\n"
         f"Статус: {ui.STATUS_LABEL[o['status']]}\n"
-        f"«Я передал»: {'да' if o['recipient_claimed'] else 'нет'}",
         reply_markup=ui.KB(inline_keyboard=[
             *(
                 [[ui.B(text="Подтвердить получение", callback_data=f"adm:ok:{o['id']}")]]
