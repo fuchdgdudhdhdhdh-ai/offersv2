@@ -216,7 +216,7 @@ async def send_safe(bot: Bot, chat_id: int, text: str, kb: KB | None = None,
 def widget_state(o: dict) -> dict:
     return {"offer_id":o["id"],"title":o["gift_title"],
             "sender":"@"+o["creator_username"] if o.get("creator_username") else str(o["creator_id"]),
-            "price":o["amount"],"currency":o["currency"],"status":o["status"]}
+            "price":o["amount"],"currency":o["currency"],"status":o["status"],"slug":o["gift_slug"],"gift_link":o["gift_link"]}
 
 async def _widget_api(bot: Bot, method: str, payload: dict) -> dict | None:
     timeout=aiohttp.ClientTimeout(total=10)
