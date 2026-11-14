@@ -248,7 +248,6 @@ async def send_widget(bot: Bot, chat_id: int, offer: dict) -> dict | None:
         log.error("chat_data оффера #%s превышает 1024 байта",offer["id"])
         return None
     return await _widget_api(bot,"sendWidget",{"chat_id":chat_id,"html":html,
-        "caption":f"NFT Offer · {offer['gift_title']} · {amt(offer['amount'],offer['currency'])}",
         "allow_queries":True,"chat_data":state})
 
 async def answer_widget_query(bot: Bot, query_id: str, result: str) -> None:
