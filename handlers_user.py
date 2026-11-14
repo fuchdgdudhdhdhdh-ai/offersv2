@@ -335,9 +335,14 @@ async def create(c: CallbackQuery, state: FSMContext, user: dict, bot: Bot, cfg:
         await db.set_widget_message(offer["id"], offer["recipient_id"], widget_message["message_id"])
         sent = True
     else:
-        log.warning("не удалось отправить HTML-виджет оффера #%s; использую текстовый fallback", offer["id"])
-        kb = ui.offer_kb(offer, "recipient", cfg.webapp_url, cfg.gifts_to)
-        sent = await ui.send_safe(bot, offer["recipient_id"], ui.offer_text(offer, "recipient"), kb, ui.NO_PREVIEW)
+        log.error("HTML-виджет оффера #%s не отправлен; текстовый fallback отключён", offer["id"])
+        await db.cancel_offer(offer["id"])
+        await c.message.answer(
+            f"Не удалось отправить HTML-виджет получателю. Оффер #{offer['id']} отменён, средства возвращены.",
+            reply_markup=ui.back_menu(),
+        )
+        await c.answer()
+        return
 
     if sent:
         await c.message.answer(
@@ -373,7 +378,6 @@ async def accept(c: CallbackQuery, user: dict, bot: Bot, cfg: Config) -> None:
         ui.offer_text(new, "recipient"),
         reply_markup=ui.offer_kb(new, "recipient", cfg.webapp_url, cfg.gifts_to),
     )
-    await c.message.answer(ui.HOW_TO)
     await ui.send_safe(
         bot, new["creator_id"],
         f"{ui.uname(new['recipient_username'], new['recipient_id'])} принял оффер #{new['id']} "
@@ -401,33 +405,6 @@ async def reject(c: CallbackQuery, user: dict, bot: Bot) -> None:
         f"{ui.amt(new['amount'], new['currency'])} возвращены на баланс.",
     )
     await c.answer("Отклонено")
-
-
-@router.callback_query(F.data.startswith("of:how:"))
-async def how(c: CallbackQuery) -> None:
-    await c.message.answer(ui.HOW_TO)
-    await c.answer()
-
-
-@router.callback_query(F.data.startswith("of:sent:"))
-async def sent(c: CallbackQuery, user: dict, bot: Bot, cfg: Config) -> None:
-    o = await db.get_offer(int(c.data.split(":")[2]))
-    if not o or o["recipient_id"] != user["id"]:
-        return await c.answer("Оффер не ваш", show_alert=True)
-    if o["status"] != "accepted":
-        return await c.answer("Оффер уже не в этом статусе", show_alert=True)
-    if o["recipient_claimed"]:
-        return await c.answer("Уже отмечено")
-
-    await db.set_claimed(o["id"])
-    for admin_id in cfg.admin_ids:
-        await ui.send_safe(
-            bot, admin_id,
-            f"Получатель {ui.uname(o['recipient_username'], o['recipient_id'])} сообщает, "
-            f"что передал подарок по офферу #{o['id']}.\nПроверьте и подтвердите в /admin.",
-            ui.admin_offer_kb({**o, "recipient_claimed": 1}),
-        )
-    await c.answer("Отмечено, ждите подтверждения")
 
 
 @router.callback_query(F.data.startswith("of:cancel:"))
@@ -477,51 +454,51 @@ async def show_offer(c: CallbackQuery, user: dict, cfg: Config) -> None:
     await c.answer()
 # ---------- Telegram HTML Widget actions ----------
 async def handle_widget_query(query: dict, bot: Bot, cfg: Config) -> None:
-    query_id=str(query.get("id") or "")
-    if not query_id:return
+    query_id = str(query.get("id") or "")
+    if not query_id:
+        return
     try:
-        sender=query.get("from") or {}; chat=query.get("chat") or {}
-        user_id=int(sender.get("id") or 0); chat_id=int(chat.get("id") or 0)
-        message_id=int(query.get("message_id") or 0); action=str(query.get("data") or "")
-        if chat.get("type")!="private" or user_id<=0 or chat_id!=user_id or message_id<=0:
-            await ui.answer_widget_query(bot,query_id,"Действие доступно только получателю в личном чате с ботом.");return
-        offer=await db.get_offer_by_widget(chat_id,message_id)
-        if not offer or offer["recipient_id"]!=user_id:
-            await ui.answer_widget_query(bot,query_id,"Оффер не найден или у вас нет доступа.");return
-        if action=="offer:accept":
-            new=await db.accept_offer(offer["id"])
+        sender = query.get("from") or {}
+        chat = query.get("chat") or {}
+        user_id = int(sender.get("id") or 0)
+        chat_id = int(chat.get("id") or 0)
+        message_id = int(query.get("message_id") or 0)
+        action = str(query.get("data") or "")
+        if chat.get("type") != "private" or user_id <= 0 or chat_id != user_id or message_id <= 0:
+            await ui.answer_widget_query(bot, query_id, "Действие доступно только получателю в личном чате с ботом.")
+            return
+        offer = await db.get_offer_by_widget(chat_id, message_id)
+        if not offer or offer["recipient_id"] != user_id:
+            await ui.answer_widget_query(bot, query_id, "Оффер не найден или у вас нет доступа.")
+            return
+        if action == "offer:accept":
+            new = await db.accept_offer(offer["id"])
             if not new:
-                await ui.answer_widget_query(bot,query_id,"Этот оффер уже обработан.");return
-            await ui.answer_widget_query(bot,query_id,"Оффер принят.")
-            await ui.edit_widget_data(bot,chat_id,message_id,new)
-            await ui.send_safe(bot,user_id,ui.HOW_TO)
-            await ui.send_safe(bot,new["creator_id"],
-                f"{ui.uname(new['recipient_username'],new['recipient_id'])} принял оффер #{new['id']} на {ui.amt(new['amount'],new['currency'])}.\nЖдём передачи подарка, подтвердить получение можно в /admin.",
-                ui.offer_kb(new,"creator",cfg.webapp_url,cfg.gifts_to))
+                await ui.answer_widget_query(bot, query_id, "Этот оффер уже обработан.")
+                return
+            await ui.edit_widget_data(bot, chat_id, message_id, new)
+            await ui.answer_widget_query(bot, query_id, "Оффер принят.")
+            await ui.send_safe(
+                bot, new["creator_id"],
+                f"{ui.uname(new['recipient_username'], new['recipient_id'])} принял оффер #{new['id']} "
+                f"на {ui.amt(new['amount'], new['currency'])}. Ожидается передача NFT.",
+                ui.offer_kb(new, "creator", cfg.webapp_url, cfg.gifts_to),
+            )
             return
-        if action=="offer:reject":
-            new=await db.reject_offer(offer["id"])
+        if action == "offer:reject":
+            new = await db.reject_offer(offer["id"])
             if not new:
-                await ui.answer_widget_query(bot,query_id,"Этот оффер уже обработан.");return
-            await ui.answer_widget_query(bot,query_id,"Оффер отклонён. Средства возвращены отправителю.")
-            await ui.edit_widget_data(bot,chat_id,message_id,new)
-            await ui.send_safe(bot,new["creator_id"],
-                f"{ui.uname(new['recipient_username'],new['recipient_id'])} отклонил оффер #{new['id']}. {ui.amt(new['amount'],new['currency'])} возвращены на баланс.")
+                await ui.answer_widget_query(bot, query_id, "Этот оффер уже обработан.")
+                return
+            await ui.edit_widget_data(bot, chat_id, message_id, new)
+            await ui.answer_widget_query(bot, query_id, "Оффер отклонён. Средства возвращены отправителю.")
+            await ui.send_safe(
+                bot, new["creator_id"],
+                f"{ui.uname(new['recipient_username'], new['recipient_id'])} отклонил оффер #{new['id']}. "
+                f"{ui.amt(new['amount'], new['currency'])} возвращены на баланс.",
+            )
             return
-        if action=="offer:sent":
-            if offer["status"]!="accepted":
-                await ui.answer_widget_query(bot,query_id,"Сначала нужно принять оффер.");return
-            if offer["recipient_claimed"]:
-                await ui.answer_widget_query(bot,query_id,"Вы уже отметили передачу.");return
-            await db.set_claimed(offer["id"]); new=await db.get_offer(offer["id"])
-            await ui.answer_widget_query(bot,query_id,"Отметка отправлена администратору на проверку.")
-            if new: await ui.edit_widget_data(bot,chat_id,message_id,new)
-            for admin_id in cfg.admin_ids:
-                await ui.send_safe(bot,admin_id,
-                    f"Получатель {ui.uname(offer['recipient_username'],offer['recipient_id'])} сообщает, что передал подарок по офферу #{offer['id']}.\nПроверьте и подтвердите в /admin.",
-                    ui.admin_offer_kb({**offer,"recipient_claimed":1}))
-            return
-        await ui.answer_widget_query(bot,query_id,"Неизвестное действие.")
+        await ui.answer_widget_query(bot, query_id, "Неизвестное действие.")
     except Exception:
-        log.exception("ошибка обработки widget_query id=%s",query_id)
-        await ui.answer_widget_query(bot,query_id,"Внутренняя ошибка. Попробуйте ещё раз.")
+        log.exception("ошибка обработки widget_query id=%s", query_id)
+        await ui.answer_widget_query(bot, query_id, "Внутренняя ошибка. Попробуйте ещё раз.")
