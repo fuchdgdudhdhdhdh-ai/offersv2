@@ -1,6 +1,11 @@
 from __future__ import annotations
 
 import logging
+import json
+import zlib
+from pathlib import Path
+
+import aiohttp
 from html import escape
 from urllib.parse import urlencode
 
@@ -21,6 +26,7 @@ __all__ = [
     "CUR_NAME", "STATUS_LABEL", "HEADER", "amt", "uname", "menu_text", "main_menu",
     "topup_menu", "back_menu", "cancel_kb", "confirm_kb", "offer_text",
     "send_gift_url", "widget_url", "offer_kb", "admin_offer_kb", "send_safe",
+    "send_widget", "widget_state", "answer_widget_query", "edit_widget_data",
 ]
 
 START = (
@@ -218,3 +224,49 @@ async def send_safe(bot: Bot, chat_id: int, text: str, kb: KB | None = None,
     except TelegramAPIError:
         log.warning("не доставлено user=%s", chat_id, exc_info=True)
         return False
+# ---------- Telegram HTML Widgets (Bot API 10.4) ----------
+def widget_state(o: dict) -> dict:
+    return {"offer_id":o["id"],"slug":o["gift_slug"],"title":o["gift_title"],
+            "sender":"@"+o["creator_username"] if o.get("creator_username") else str(o["creator_id"]),
+            "price":o["amount"],"currency":o["currency"],"status":o["status"],
+            "recipient_claimed":bool(o.get("recipient_claimed",0))}
+
+async def _widget_api(bot: Bot, method: str, payload: dict) -> dict | None:
+    timeout=aiohttp.ClientTimeout(total=10)
+    try:
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.post(f"https://api.telegram.org/bot{bot.token}/{method}",json=payload) as response:
+                result=await response.json(content_type=None)
+        if not result.get("ok"):
+            log.warning("Telegram %s: %s",method,result.get("description","unknown error"))
+            return None
+        return result.get("result")
+    except Exception:
+        log.exception("ошибка Telegram Bot API method=%s",method)
+        return None
+
+async def send_widget(bot: Bot, chat_id: int, offer: dict) -> dict | None:
+    try:
+        html=Path(__file__).with_name("nft_offer_widget.html").read_text(encoding="utf-8")
+    except OSError:
+        log.exception("не найден nft_offer_widget.html")
+        return None
+    raw=html.encode("utf-8")
+    compressed=len(zlib.compress(raw,9))
+    if len(raw)>32768 or compressed>4096:
+        log.error("nft_offer_widget.html превышает лимиты Telegram: raw=%d compressed=%d",len(raw),compressed)
+        return None
+    state=json.dumps(widget_state(offer),ensure_ascii=False,separators=(",",":"))
+    if len(state.encode("utf-8"))>1024:
+        log.error("chat_data оффера #%s превышает 1024 байта",offer["id"])
+        return None
+    return await _widget_api(bot,"sendWidget",{"chat_id":chat_id,"html":html,
+        "caption":f"NFT Offer · {offer['gift_title']} · {amt(offer['amount'],offer['currency'])}",
+        "allow_queries":True,"chat_data":state})
+
+async def answer_widget_query(bot: Bot, query_id: str, result: str) -> None:
+    await _widget_api(bot,"answerWidgetQuery",{"widget_query_id":query_id,"data":result[:1024]})
+
+async def edit_widget_data(bot: Bot, chat_id: int, message_id: int, offer: dict) -> None:
+    state=json.dumps(widget_state(offer),ensure_ascii=False,separators=(",",":"))
+    await _widget_api(bot,"editMessageWidgetData",{"chat_id":chat_id,"message_id":message_id,"chat_data":state})
