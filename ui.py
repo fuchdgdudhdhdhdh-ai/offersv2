@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import logging
+import json
+from pathlib import Path
+
+import aiohttp
 from html import escape
 from urllib.parse import urlencode
 
@@ -218,3 +222,68 @@ async def send_safe(bot: Bot, chat_id: int, text: str, kb: KB | None = None,
     except TelegramAPIError:
         log.warning("не доставлено user=%s", chat_id, exc_info=True)
         return False
+
+
+# ---------- встроенные Telegram Widgets ----------
+
+async def _widget_api(bot: Bot, method: str, payload: dict) -> dict | None:
+    timeout = aiohttp.ClientTimeout(total=8)
+    try:
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.post(
+                f"https://api.telegram.org/bot{bot.token}/{method}", json=payload
+            ) as response:
+                body = await response.json(content_type=None)
+        if not body.get("ok"):
+            log.warning("Telegram %s завершился ошибкой: %s", method, body.get("description"))
+            return None
+        return body.get("result")
+    except Exception:
+        log.exception("ошибка вызова Telegram %s", method)
+        return None
+
+
+def widget_state(o: dict) -> dict:
+    return {
+        "title": o["gift_title"],
+        "slug": o["gift_slug"],
+        "sender": "@" + o["creator_username"] if o.get("creator_username") else str(o["creator_id"]),
+        "price": o["amount"],
+        "currency": o["currency"],
+        "status": o["status"],
+    }
+
+
+async def send_widget(bot: Bot, chat_id: int, o: dict) -> dict | None:
+    try:
+        html = Path(__file__).with_name("offer_widget.html").read_text(encoding="utf-8")
+    except OSError:
+        log.exception("не найден offer_widget.html")
+        return None
+    state = json.dumps(widget_state(o), ensure_ascii=False, separators=(",", ":"))
+    if len(state.encode("utf-8")) > 1024:
+        log.error("chat_data оффера #%s превышает 1024 байта", o["id"])
+        return None
+    return await _widget_api(bot, "sendWidget", {
+        "chat_id": chat_id,
+        "html": html,
+        "caption": f"NFT Offer · {o['gift_title']} · {amt(o['amount'], o['currency'])}",
+        "allow_queries": True,
+        "chat_data": state,
+    })
+
+
+async def answer_widget_query(bot: Bot, query_id: str, data: str) -> None:
+    await _widget_api(bot, "answerWidgetQuery", {
+        "widget_query_id": query_id,
+        "data": data[:1024],
+    })
+
+
+async def edit_widget_data(bot: Bot, chat_id: int, message_id: int, o: dict) -> None:
+    state = json.dumps(widget_state(o), ensure_ascii=False, separators=(",", ":"))
+    await _widget_api(bot, "editMessageWidgetData", {
+        "chat_id": chat_id,
+        "message_id": message_id,
+        "chat_data": state,
+    })
