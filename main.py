@@ -72,12 +72,6 @@ async def webhook(request: web.Request) -> web.Response:
     except Exception:
         log.exception("невалидный JSON")
         raise web.HTTPBadRequest()
-    try:
-        update = Update.model_validate(payload, context={"bot": bot})
-    except Exception:
-        log.exception("невалидный Update: %s", payload)
-        return web.json_response({"ok": True})
-    log.debug("update %s", update.update_id)
     if "widget_query" in payload:
         async def process_widget_query(query: dict) -> None:
             try:
@@ -88,8 +82,14 @@ async def webhook(request: web.Request) -> web.Response:
                 if query_id:
                     await ui.answer_widget_query(bot, query_id, "Внутренняя ошибка. Попробуйте ещё раз.")
         asyncio.create_task(process_widget_query(payload["widget_query"]))
-    else:
-        asyncio.create_task(feed(update))
+        return web.json_response({"ok": True})
+    try:
+        update = Update.model_validate(payload, context={"bot": bot})
+    except Exception:
+        log.exception("невалидный Update: %s", payload)
+        return web.json_response({"ok": True})
+    log.debug("update %s", update.update_id)
+    asyncio.create_task(feed(update))
     return web.json_response({"ok": True})
 
 
