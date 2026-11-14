@@ -7,7 +7,12 @@ import aiohttp
 
 log = logging.getLogger("gift")
 
-_SLUG = re.compile(r"(?:t\.me/nft/|tg://nft\?slug=)?([A-Za-z0-9_-]{2,64})")
+
+_SLUG = re.compile(
+    r"(?:https?://)?t\.me/nft/([A-Za-z0-9_-]{2,64})(?:[/?#].*)?$|"
+    r"tg://nft\?slug=([A-Za-z0-9_-]{2,64})"
+)
+
 _TITLE = re.compile(r'<meta[^>]+property="og:title"[^>]+content="([^"]*)"', re.I)
 _cache: dict[str, str] = {}
 
@@ -19,17 +24,22 @@ PRETTY = {
 }
 
 
+
 def parse(raw: str) -> str | None:
     raw = raw.strip()
+
     if not raw:
         return None
-    m = _SLUG.search(raw)
+
+    m = _SLUG.fullmatch(raw)
+
     if not m:
         return None
-    slug = m.group(1)
-    if slug in ("nft", "https", "http", "t.me", "tg"):
-        return None
+
+    slug = m.group(1) or m.group(2)
+
     return slug
+
 
 
 def pretty(slug: str) -> str:
