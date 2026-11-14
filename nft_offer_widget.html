@@ -1,25 +1,90 @@
-<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
-:root{--bg:var(--tg-theme-secondary-bg-color,#20242e);--text:var(--tg-theme-text-color,#f4f6fa);--hint:var(--tg-theme-hint-color,#9aa3b2);--blue:var(--tg-theme-button-color,#2aabee);--blueText:var(--tg-theme-button-text-color,#fff);--red:var(--tg-theme-destructive-text-color,#ff6259);--green:#30c878;--amber:#f2b84b}
-*{box-sizing:border-box}body{margin:0;padding:0;background:var(--tg-theme-bg-color,transparent);color:var(--text);font:14px system-ui,sans-serif}.card{overflow:hidden;border:1px solid #ffffff18;border-radius:18px;background:var(--bg)}.head{padding:14px 16px;background:linear-gradient(105deg,#2196e8,#5969e8 58%,#7955d8);color:white;font-size:16px;font-weight:750}.body{padding:16px}.nft{display:flex;align-items:center;gap:13px;margin-bottom:15px}.art{width:68px;height:68px;flex:none;border-radius:15px;display:grid;place-items:center;background:linear-gradient(140deg,#e7b45d,#8553b7);font-size:35px}.info{min-width:0;flex:1}.title{font-size:17px;font-weight:750;overflow-wrap:anywhere}.from{margin-top:4px;color:var(--hint);font-size:13px}.price{display:inline-flex;align-items:center;gap:7px;margin-top:9px;font-size:19px;font-weight:800;color:var(--blue)}.status{padding:10px 12px;margin:0 0 13px;border-radius:11px;text-align:center;font-weight:650;background:#f2b84b20;color:var(--amber)}.status.accepted,.status.completed,.status.paid{background:#30c87820;color:var(--green)}.status.rejected,.status.cancelled{background:#ff625920;color:var(--red)}.actions{display:flex;flex-direction:column;gap:9px}.btn{display:block;width:100%;padding:13px 14px;border:0;border-radius:12px;text-align:center;font:inherit;font-size:15px;font-weight:700;color:var(--blueText);background:var(--blue)}.btn.secondary{background:transparent;border:1px solid #ffffff40;color:var(--text)}.btn.danger{background:#ffffff0b;border:1px solid #ffffff40;color:var(--red)}.hidden{display:none!important}.shade{position:fixed;inset:0;background:#0009;opacity:0;pointer-events:none;transition:opacity .2s}.shade.open{opacity:1;pointer-events:auto}.sheet{position:fixed;left:0;right:0;bottom:0;padding:10px 18px 18px;background:var(--bg);border:1px solid #ffffff24;border-bottom:0;border-radius:20px 20px 0 0;transform:translateY(110%);transition:transform .24s}.sheet.open{transform:translateY(0)}.grab{width:38px;height:4px;margin:0 auto 15px;border-radius:5px;background:#ffffff55}.sheet h3{margin:0 0 13px;font-size:18px}.step{display:flex;gap:10px;align-items:flex-start;margin:10px 0;line-height:1.45}.num{width:23px;height:23px;flex:none;display:grid;place-items:center;border-radius:50%;background:#287fdb;color:#fff;font-weight:750}.muted{color:var(--hint)}.destination{padding:10px 12px;margin:12px 0;border-radius:10px;background:#ffffff0c;font-weight:700;overflow-wrap:anywhere}
-</style></head><body><div class="card"><div class="head" id="head">Оффер NFT</div><div class="body"><div class="nft"><div class="art">🎁</div><div class="info"><div class="title" id="title">NFT</div><div class="from">От <b id="sender">—</b></div><div class="price" id="price">—</div></div></div><div class="status" id="status">Ожидание ответа</div><div class="actions" id="pending"><button class="btn" id="accept">✅ Принять</button><button class="btn danger" id="reject">❌ Отклонить</button></div><div class="actions hidden" id="accepted"><button class="btn" id="transfer">Передать NFT</button><button class="btn secondary" id="how">Как передать NFT</button></div><div class="muted" id="result" aria-live="polite"></div></div></div><div class="shade" id="shade"></div><section class="sheet" id="sheet"><div class="grab"></div><h3>Передача NFT</h3><div class="step"><span class="num">1</span><span>Откройте свой профиль Telegram и перейдите в раздел <b>«Мои подарки»</b>.</span></div><div class="step"><span class="num">2</span><span>Выберите подарок <b id="sheetTitle">NFT</b> и нажмите <b>«Передать»</b>.</span></div><div class="step"><span class="num">3</span><span>Укажите получателя оффера и подтвердите передачу подарка.</span></div><div class="destination" id="destination">Получатель: —</div><p class="muted">После передачи больше ничего нажимать не нужно. Администратор проверит получение и подтвердит его в панели управления.</p><button class="btn" id="understood">Я понял</button></section><script>
-const tg=window.TelegramWidget;
-const el=id=>document.getElementById(id);
-let state={};
-function draw(raw){if(!raw)return;try{state=typeof raw==="string"?JSON.parse(raw):raw}catch(e){return}
-el("title").textContent=state.title||"NFT";el("sheetTitle").textContent=state.title||"NFT";
-el("sender").textContent=state.sender||"—";el("destination").textContent="Получатель: "+(state.sender||"—");
-const cur=state.currency==="stars"?"⭐ Stars":"💎 GRAM";
-el("price").textContent=Number(state.price||0).toLocaleString("ru-RU")+" "+cur;
-const s=state.status||"pending";el("pending").classList.toggle("hidden",s!=="pending");el("accepted").classList.toggle("hidden",s!=="accepted");
-const names={pending:"⌛ Ожидание ответа",accepted:"✅ Оффер принят · Ожидается передача",completed:"✅ Получение подтверждено",paid:"✅ Выплачено",rejected:"❌ Оффер отклонён",cancelled:"❌ Оффер отменён"};
-el("status").textContent=names[s]||s;el("status").className="status "+s;
-el("head").textContent=s==="pending"?"Предложение о покупке NFT":s==="accepted"?"Сделка по NFT":"Статус сделки";
+<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"><title>NFT Offer</title><style>
+:root{ --bg:#0b0d12; --bg-2:#10131a; --card:rgba(26,30,40,.72); --card-solid:#171b24; --stroke:rgba(255,255,255,.08); --text:#f4f6fa; --hint:#8b93a5; --blue:#2aabee; --blue-2:#4f7cff; --violet:#8b5cf6; --green:#30d158; --red:#ff453a; --amber:#ffb340; --ton:#0098ea;
 }
-function openInstructions(){el("shade").classList.add("open");el("sheet").classList.add("open");if(typeof tg.setResizeAnchor==="function")tg.setResizeAnchor("bottom")}
-function closeInstructions(){el("shade").classList.remove("open");el("sheet").classList.remove("open")}
-function act(name){el("result").textContent="Обрабатываем…";tg.request("offer:"+name).then(r=>{el("result").textContent=r.result||""},e=>{el("result").textContent="Не удалось выполнить действие: "+e.code})}
-el("accept").addEventListener("click",()=>act("accept"));el("reject").addEventListener("click",()=>act("reject"));
-el("transfer").addEventListener("click",openInstructions);el("how").addEventListener("click",openInstructions);
-el("understood").addEventListener("click",closeInstructions);el("shade").addEventListener("click",closeInstructions);
-draw(tg.chatData);tg.onEvent("chatDataChanged",()=>draw(tg.chatData));tg.ready();
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%}
+body{ font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif; color:var(--text); background:var(--bg); min-height:100vh; display:flex;align-items:center;justify-content:center; padding:16px; position:relative;overflow-x:hidden;
+} .bg{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden; background: radial-gradient(900px 500px at 15% -10%, rgba(79,124,255,.22), transparent 60%), radial-gradient(700px 500px at 100% 10%, rgba(139,92,246,.20), transparent 60%), radial-gradient(800px 600px at 50% 120%, rgba(42,171,238,.16), transparent 60%), linear-gradient(180deg,#0b0d12,#0d1017 60%,#090b10);
+}
+.blob{position:absolute;border-radius:50%;filter:blur(70px);opacity:.55;animation:float 16s ease-in-out infinite}
+.blob.b1{width:260px;height:260px;background:#2a5bff;top:8%;left:-80px}
+.blob.b2{width:240px;height:240px;background:#8b5cf6;bottom:6%;right:-70px;animation-delay:-6s}
+@keyframes float{50%{transform:translate(30px,-26px) scale(1.08)}}
+.grain{position:absolute;inset:0;opacity:.05;mix-blend-mode:overlay; background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>")} .widget{ position:relative;z-index:1;width:100%;max-width:400px; background:var(--card); backdrop-filter:blur(24px) saturate(140%);-webkit-backdrop-filter:blur(24px) saturate(140%); border:1px solid var(--stroke);border-radius:26px;overflow:hidden; box-shadow:0 30px 60px -20px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.06); animation:rise .5s cubic-bezier(.2,.8,.2,1);
+}
+@keyframes rise{from{opacity:0;transform:translateY(14px) scale(.98)}} .header{ position:relative;padding:16px 18px;display:flex;align-items:center;gap:10px; font-weight:600;font-size:15px;letter-spacing:.1px; background:linear-gradient(100deg,#1f8fe0 0%,#4f6cf0 55%,#7a56e0 100%); overflow:hidden;
+}
+.header::after{content:"";position:absolute;inset:0; background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.22) 50%,transparent 70%); transform:translateX(-100%);animation:shine 4.5s ease-in-out infinite}
+@keyframes shine{60%,100%{transform:translateX(100%)}}
+.header svg{width:20px;height:20px;flex:none;position:relative;z-index:1}
+.header span{position:relative;z-index:1} .content{padding:18px} .nft{display:flex;gap:14px;align-items:center;margin-bottom:16px}
+.nft-img{ width:84px;height:84px;flex:none;border-radius:18px;position:relative;overflow:hidden; background:linear-gradient(145deg,#3a8f5a,#1f5a3a); box-shadow:0 10px 24px -8px rgba(48,209,88,.45), inset 0 0 0 1px rgba(255,255,255,.12);
+}
+.nft-img img{width:100%;height:100%;object-fit:cover;display:block;opacity:0;transition:opacity .4s}
+.nft-img img.loaded{opacity:1}
+.nft-img .ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.nft-img .ph svg{width:44px;height:44px;opacity:.85}
+.nft-img img.loaded ~ .ph{display:none} .nft-meta{min-width:0;flex:1}
+.nft-title{margin:0;font-size:17px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nft-sender{margin:4px 0 10px;font-size:13px;color:var(--hint)}
+.nft-sender b{color:var(--blue);font-weight:600}
+.price{ display:inline-flex;align-items:center;gap:7px;padding:7px 12px 7px 9px;border-radius:999px; background:rgba(0,152,234,.14);border:1px solid rgba(0,152,234,.28); font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;
+}
+.price svg{width:20px;height:20px;display:block}
+.cur-name{font-size:12px;font-weight:600;color:var(--hint);margin-left:-2px} .status{ display:flex;align-items:center;justify-content:center;gap:8px; padding:10px 14px;margin-bottom:16px;border-radius:12px;font-size:14px;font-weight:600; transition:all .3s;
+}
+.status svg{width:18px;height:18px;flex:none}
+.status.pending{color:var(--amber);background:rgba(255,179,64,.10)}
+.status.pending svg{animation:spin 6s linear infinite}
+.status.accepted{color:var(--green);background:rgba(48,209,88,.12)}
+.status.rejected{color:var(--red);background:rgba(255,69,58,.12)}
+@keyframes spin{to{transform:rotate(360deg)}} .actions{display:flex;flex-direction:column;gap:10px}
+.btn{ width:100%;padding:14px;border:0;border-radius:14px;font:inherit;font-size:15px;font-weight:600; display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer; color:var(--text);text-decoration:none;transition:transform .12s, filter .2s, background .2s;
+}
+.btn svg{width:19px;height:19px;flex:none}
+.btn:active{transform:scale(.97)}
+.btn-primary{ background:linear-gradient(100deg,#2196f3,#5b6cf5); box-shadow:0 10px 22px -8px rgba(59,130,246,.65), inset 0 1px 0 rgba(255,255,255,.25);
+}
+.btn-primary:hover{filter:brightness(1.08)}
+.btn-ghost{background:rgba(255,255,255,.06);border:1px solid var(--stroke)}
+.btn-ghost:hover{background:rgba(255,255,255,.10)}
+.btn-danger{color:#ff6a60}
+.hidden{display:none!important} .overlay{position:fixed;inset:0;z-index:10;background:rgba(0,0,0,.55);backdrop-filter:blur(4px); opacity:0;pointer-events:none;transition:opacity .25s}
+.overlay.open{opacity:1;pointer-events:auto}
+.sheet{ position:fixed;left:0;right:0;bottom:0;z-index:11;max-width:460px;margin:0 auto; background:linear-gradient(180deg,#1b1f2a,#141821);border-radius:26px 26px 0 0; border:1px solid var(--stroke);border-bottom:0;padding:10px 20px calc(22px + env(safe-area-inset-bottom)); transform:translateY(105%);transition:transform .35s cubic-bezier(.2,.8,.2,1);
+}
+.sheet.open{transform:none}
+.grab{width:40px;height:4px;border-radius:4px;background:rgba(255,255,255,.2);margin:0 auto 16px}
+.sheet h4{margin:0 0 14px;font-size:18px}
+.step{display:flex;gap:12px;align-items:flex-start;margin-bottom:12px;font-size:14.5px;line-height:1.4}
+.step i{ flex:none;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center; font-style:normal;font-size:13px;font-weight:700;background:linear-gradient(135deg,#2196f3,#7655d9)
+}
+.step b{color:#fff}
+.note{margin:6px 0 16px;padding:10px 12px;border-radius:12px;font-size:13px;color:var(--hint);background:rgba(255,255,255,.04)}
+</style></head><body><div class="bg"><div class="blob b1"></div><div class="blob b2"></div><div class="grain"></div></div><div class="widget" id="widget"><div class="header"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.3" fill="#fff"/></svg><span id="headerText">Предложение о покупке NFT</span></div><div class="content"><div class="nft"><div class="nft-img"><img id="nftImg" alt="NFT"><div class="ph"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="13" rx="2"/><path d="M12 8v13M3 13h18M12 8c-1.5-4-5-4-5-2s2.5 2 5 2Zm0 0c1.5-4 5-4 5-2s-2.5 2-5 2Z"/></svg></div></div><div class="nft-meta"><h3 class="nft-title" id="nftTitle">—</h3><p class="nft-sender">От <b id="senderName">—</b></p><div class="price"><span class="cur-icon" id="curIcon"></span><span id="priceValue">0</span><span class="cur-name" id="curName"></span></div></div></div><div class="status pending" id="statusBlock"></div><div class="actions" id="actionsPending"><button class="btn btn-primary" onclick="acceptOffer()"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg> Принять </button><button class="btn btn-ghost btn-danger" onclick="rejectOffer()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg> Отклонить </button></div><div class="actions hidden" id="actionsAccepted"><a id="transferBtn" class="btn btn-primary" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h12l-3-3M17 17H5l3 3"/></svg> Передать NFT </a><button class="btn btn-ghost" onclick="openSheet()"><svg viewBox="0 0 24 24" fill="none" stroke="#8b93a5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 1 1 3.6 2.2c-.8.4-1.2 1-1.2 1.8M12 17h.01"/></svg> Как передать? </button></div></div></div><div class="overlay" id="overlay" onclick="closeSheet()"></div><div class="sheet" id="sheet"><div class="grab"></div><h4>Как передать NFT</h4><div class="step"><i>1</i><div>Нажмите <b>«Передать NFT»</b> — откроется страница подарка.</div></div><div class="step"><i>2</i><div>Откройте вкладку <b>«Мои»</b> в профиле.</div></div><div class="step"><i>3</i><div>Выберите свой подарок и <b>подтвердите передачу</b>.</div></div><div class="note">После передачи ничего дополнительно нажимать не нужно. Администратор проверит передачу и подтвердит её.</div><button class="btn btn-primary" onclick="closeSheet()">Понятно</button></div><script> const tg = window.TelegramWidget;
+const state = {};
+const data = tg.chatData || {};
+const haptic = type => { try { if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred(type); } catch(e) {} };
+const nftLink = data.gift_link || ("https://t.me/nft/" + (data.slug || ""));
+const offerData = { nftSlug: data.slug || "", nftTitle: data.title || "NFT", sender: data.sender || "—", price: data.price || 0, cur: (data.currency || "gram").toLowerCase(), imageUrl: data.image_url || "", status: data.status || "pending"
+};
+const CUR = { gram: {name:"GRAM",svg:'<svg viewBox="0 0 56 56" xmlns="http://www.w3.org/2000/svg"><circle cx="28" cy="28" r="28" fill="#0098EA"/><path fill="#fff" d="M37.56 15.63H18.44c-3.52 0-5.75 3.79-3.98 6.86l11.8 20.45a2 2 0 0 0 3.47 0l11.84-20.45c1.73-3.07-.5-6.86-4-6.86Zm-11.3 21.18-2.57-4.98-6.2-11.09c-.41-.71.1-1.62.95-1.62h7.82v17.69Zm12.25-16.07-6.2 11.1-2.57 4.97V19.12h7.82c.86 0 1.36.91.95 1.62Z"/></svg>'}, stars:{name:"Stars",svg:'<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="sg" x1=".2" y1="0" x2=".8" y2="1"><stop offset="0" stop-color="#ffe45c"/><stop offset=".55" stop-color="#ffb800"/><stop offset="1" stop-color="#f08a00"/></linearGradient></defs><polygon points="12,3.2 14.53,9.32 21.13,9.83 16.09,14.13 17.64,20.57 12,17.1 6.36,20.57 7.91,14.13 2.87,9.83 9.47,9.32" fill="url(#sg)"/></svg>'}
+};
+const ICONS = { pending:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>', accepted:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg>', rejected:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="m9 9 6 6M15 9l-6 6"/></svg>'
+};
+function setStatus(kind,text){ const el=document.getElementById('statusBlock'); el.className='status '+kind; el.innerHTML=(ICONS[kind]||ICONS.pending)+'<span>'+text+'</span>';
+}
+function render(raw){ const d=raw||tg.chatData||{}; offerData.nftSlug=d.slug||offerData.nftSlug; offerData.nftTitle=d.title||offerData.nftTitle; offerData.sender=d.sender||offerData.sender; offerData.price=d.price??offerData.price; offerData.cur=(d.currency||offerData.cur||"gram").toLowerCase(); offerData.imageUrl=d.image_url||offerData.imageUrl; offerData.status=d.status||offerData.status; document.getElementById('senderName').textContent=offerData.sender; document.getElementById('priceValue').textContent=Number(offerData.price).toLocaleString('ru-RU'); const cur=CUR[offerData.cur]||CUR.gram; document.getElementById('curIcon').innerHTML=cur.svg; document.getElementById('curName').textContent=cur.name; document.getElementById('nftTitle').textContent=offerData.nftTitle; document.getElementById('headerText').textContent=offerData.status==="pending"?"Предложение о покупке NFT":offerData.status==="accepted"?"Сделка по NFT":"Статус сделки"; if(offerData.status==="pending") setStatus("pending","Ожидание ответа"); else if(offerData.status==="accepted") setStatus("accepted","Принято · Ожидается передача"); else if(offerData.status==="rejected") setStatus("rejected","Оффер отклонён"); else if(offerData.status==="completed"||offerData.status==="paid") setStatus("accepted","Получение подтверждено"); else setStatus("rejected","Оффер отменён"); document.getElementById('actionsPending').classList.toggle('hidden',offerData.status!=="pending"); document.getElementById('actionsAccepted').classList.toggle('hidden',offerData.status!=="accepted"); document.getElementById('transferBtn').href=d.gift_link||("https://t.me/nft/"+offerData.nftSlug); loadNftImage();
+}
+function loadNftImage(){ const slug=(offerData.nftSlug||"").toLowerCase(); const sources=[offerData.imageUrl,"https://nft.fragment.com/gift/"+slug+".medium.webp","https://nft.fragment.com/gift/"+slug+".webp"].filter(Boolean); const img=document.getElementById('nftImg');let i=0; img.onload=()=>img.classList.add('loaded'); img.onerror=()=>{if(++i<sources.length)img.src=sources[i];}; if(sources.length)img.src=sources[0];
+}
+async function sendAction(action){ try{ const result=await tg.request("offer:"+action); if(action==="accept"){haptic("success");render({...tg.chatData,status:"accepted"});} else {haptic("error");render({...tg.chatData,status:"rejected"});} return result; }catch(error){ setStatus(offerData.status,"Не удалось выполнить действие. Попробуйте ещё раз."); }
+}
+function acceptOffer(){sendAction("accept");}
+function rejectOffer(){sendAction("reject");}
+function openSheet(){document.getElementById('overlay').classList.add('open');document.getElementById('sheet').classList.add('open');}
+function closeSheet(){document.getElementById('overlay').classList.remove('open');document.getElementById('sheet').classList.remove('open');}
+render(tg.chatData);
+tg.onEvent("chatDataChanged",()=>render(tg.chatData));
+tg.ready();
 </script></body></html>
