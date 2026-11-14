@@ -344,17 +344,10 @@ async def create(c: CallbackQuery, state: FSMContext, user: dict, bot: Bot, cfg:
         await c.answer()
         return
 
-    if sent:
-        await c.message.answer(
-            f"Оффер #{offer['id']} отправлен. {ui.amt(offer['amount'], offer['currency'])} заморожены.",
-            reply_markup=ui.back_menu(),
-        )
-    else:
-        await db.cancel_offer(offer["id"])
-        await c.message.answer(
-            f"Получатель закрыл бота — доставка не удалась. Оффер #{offer['id']} отменён, деньги возвращены.",
-            reply_markup=ui.back_menu(),
-        )
+    await c.message.answer(
+        f"Оффер #{offer['id']} отправлен. {ui.amt(offer['amount'], offer['currency'])} заморожены.",
+        reply_markup=ui.back_menu(),
+    )
     await c.answer()
 
 
