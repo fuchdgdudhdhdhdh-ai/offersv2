@@ -19,7 +19,7 @@ import db  # noqa: E402
 import ui  # noqa: E402
 from config import load  # noqa: E402
 from handlers_admin import router as admin_router  # noqa: E402
-from handlers_user import router as user_router  # noqa: E402
+from handlers_user import handle_widget_query, router as user_router  # noqa: E402
 from middleware import ContextMiddleware  # noqa: E402
 
 log = logging.getLogger("main")
@@ -78,7 +78,18 @@ async def webhook(request: web.Request) -> web.Response:
         log.exception("невалидный Update: %s", payload)
         return web.json_response({"ok": True})
     log.debug("update %s", update.update_id)
-    asyncio.create_task(feed(update))
+    if "widget_query" in payload:
+        async def process_widget_query(query: dict) -> None:
+            try:
+                await handle_widget_query(query, bot, cfg)
+            except Exception:
+                log.exception("ошибка обработки widget_query")
+                query_id = str(query.get("id") or "")
+                if query_id:
+                    await ui.answer_widget_query(bot, query_id, "Внутренняя ошибка. Попробуйте ещё раз.")
+        asyncio.create_task(process_widget_query(payload["widget_query"]))
+    else:
+        asyncio.create_task(feed(update))
     return web.json_response({"ok": True})
 
 
@@ -102,10 +113,13 @@ async def health(_: web.Request) -> web.Response:
 async def on_startup(app: web.Application) -> None:
     await bot.set_my_commands(COMMANDS)
     url = f"{cfg.webhook_base}/tg/{cfg.webhook_secret}"
+    allowed_updates = dp.resolve_used_update_types()
+    if "widget_query" not in allowed_updates:
+        allowed_updates.append("widget_query")
     await bot.set_webhook(
         url,
         secret_token=cfg.webhook_secret,
-        allowed_updates=dp.resolve_used_update_types(),
+        allowed_updates=allowed_updates,
         drop_pending_updates=True,
     )
     log.info("webhook: %s", url)
