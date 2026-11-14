@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: offerbot
+    runtime: python
+    plan: free
+    region: frankfurt
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: ADMIN_IDS
+        sync: false
+      - key: WEBHOOK_BASE_URL
+        sync: false
+      - key: WEBHOOK_SECRET
+        generateValue: true
+      - key: GIFTS_TO
+        sync: false
+      - key: LOG_LEVEL
+        value: INFO
+      - key: DB_PATH
+        value: bot.db
+      # платный план: раскомментируй и добавь диск
+      # - key: DB_PATH
+      #   value: /var/data/bot.db
